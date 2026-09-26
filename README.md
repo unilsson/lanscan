@@ -1,12 +1,15 @@
 # lanscan
 
-A small Python CLI for discovering devices and detecting IPv4 address conflicts on a local LAN using ARP.
+A small Python CLI for discovering devices, resolving hostnames and detecting IPv4 address conflicts on a local LAN.
 
 ## Features
 
 - Active LAN discovery using `arp-scan`
 - Numeric IP sorting
-- Displays IP address, MAC address and vendor
+- Displays IP address, status, reverse-DNS hostname, MAC address and vendor
+- Reverse lookups through the system resolver/NSS
+- DNS lookups run concurrently with a configurable timeout
+- `--no-dns` mode for ARP-only scans
 - Detects multiple MAC addresses responding for the same IP
 - Shows apparently free addresses with `--all`
 - Conflict-only mode with `--conflicts`
@@ -19,6 +22,7 @@ A small Python CLI for discovering devices and detecting IPv4 address conflicts 
 - Linux
 - Python 3.11+
 - `arp-scan`
+- `getent` for hostname lookups (normally provided by glibc/libc-bin)
 
 Ubuntu/Debian:
 
@@ -36,7 +40,7 @@ pip install -e .
 
 ## Usage
 
-Scan the local network:
+Scan the local network and resolve PTR hostnames:
 
 ```bash
 lanscan
@@ -47,6 +51,29 @@ Scan a specific subnet:
 ```bash
 lanscan 192.168.1.0/24
 ```
+
+Example output:
+
+```text
+IP               STATUS    HOSTNAME                          MAC                VENDOR
+192.168.1.1      USED      opnsense.ulnihnw.net             20:7c:14:...       Qotom
+192.168.1.20     USED      homeproxy.ulnihnw.net            aa:bb:cc:...       Intel
+192.168.1.35     USED      -                                 11:22:33:...       Espressif
+```
+
+Disable hostname lookups:
+
+```bash
+lanscan 192.168.1.0/24 --no-dns
+```
+
+Change the per-query DNS timeout:
+
+```bash
+lanscan 192.168.1.0/24 --dns-timeout 0.5
+```
+
+`lanscan` uses the host operating system's resolver through `getent`. If the machine uses OPNsense/Unbound as its DNS server, PTR lookups therefore follow the same DNS path as other applications on that host.
 
 Show used and apparently free addresses:
 
@@ -72,6 +99,8 @@ JSON output:
 lanscan 192.168.1.0/24 --json
 ```
 
+Each JSON host now includes a `hostname` field. It is `null` when no PTR/NSS name could be resolved.
+
 Conflict-only JSON output:
 
 ```bash
@@ -80,11 +109,24 @@ lanscan 192.168.1.0/24 --conflicts --json
 
 When `--conflicts` finds one or more conflicts, `lanscan` exits with status code `2`. If no conflicts are found it exits with `0`. This makes the command suitable for monitoring and automation.
 
+## Code structure
+
+```text
+src/lanscan/
+├── arp.py       # arp-scan execution and parsing
+├── cli.py       # CLI argument parsing and orchestration
+├── dns.py       # reverse hostname resolution
+├── models.py    # shared data model
+└── output.py    # text and JSON presentation
+```
+
 ## Important
 
 `FREE` means that no host responded to ARP during the scan. It does not guarantee that the address is permanently unused.
 
 Likewise, conflict detection reports what was observed on the wire: more than one MAC address answered for the same IPv4 address during the scan passes.
+
+A missing hostname only means that the system resolver did not return a name within the configured timeout. It does not affect ARP discovery.
 
 ## Tests
 
@@ -96,6 +138,5 @@ python -m unittest discover -s tests -v
 
 - OPNsense DHCP lease integration
 - OPNsense static mapping integration
-- Hostnames and DNS data
 - Better correlation of active, leased and reserved addresses
 - Rich/TUI interface
