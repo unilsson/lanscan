@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lanscan"
-version = "0.1.0"
-description = "A simple LAN discovery CLI based on arp-scan"
+version = "0.2.0"
+description = "A LAN discovery CLI with ARP conflict detection and reverse DNS"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
