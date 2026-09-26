@@ -12,6 +12,7 @@ A small Python CLI for discovering devices, resolving hostnames and detecting IP
 - `--no-dns` mode for ARP-only scans
 - Detects multiple MAC addresses responding for the same IP
 - Shows apparently free addresses with `--all`
+- Shows only apparently free addresses with `--free`
 - Conflict-only mode with `--conflicts`
 - Multiple ARP sweeps with `--passes`
 - JSON output
@@ -81,6 +82,14 @@ Show used and apparently free addresses:
 lanscan 192.168.1.0/24 --all
 ```
 
+Show only apparently free addresses:
+
+```bash
+lanscan 192.168.1.0/24 --free
+```
+
+The network and broadcast addresses are excluded automatically. For example, with `192.168.1.0/24`, `--free` considers host addresses `192.168.1.1` through `192.168.1.254`.
+
 Show only detected IP conflicts:
 
 ```bash
@@ -99,7 +108,15 @@ JSON output:
 lanscan 192.168.1.0/24 --json
 ```
 
-Each JSON host now includes a `hostname` field. It is `null` when no PTR/NSS name could be resolved.
+Each JSON host includes a `hostname` field. It is `null` when no PTR/NSS name could be resolved.
+
+Free-only JSON output:
+
+```bash
+lanscan 192.168.1.0/24 --free --json
+```
+
+Free addresses are emitted with `"status": "free"`, `"hostname": null` and an empty `devices` list. `--all --json` includes both used and free addresses.
 
 Conflict-only JSON output:
 
