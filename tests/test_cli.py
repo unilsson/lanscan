@@ -12,8 +12,8 @@ class ParseArpScanOutputTests(unittest.TestCase):
         )
         ip = ipaddress.ip_address("192.168.1.10")
 
-        self.assertEqual(hosts[ip][0]["mac"], "aa:bb:cc:dd:ee:ff")
-        self.assertEqual(hosts[ip][0]["vendor"], "Example Vendor")
+        self.assertEqual(hosts[ip][0].mac, "aa:bb:cc:dd:ee:ff")
+        self.assertEqual(hosts[ip][0].vendor, "Example Vendor")
 
     def test_duplicate_reply_from_same_mac_is_ignored(self):
         output = (
