@@ -2,7 +2,7 @@ import ipaddress
 import unittest
 from collections import defaultdict
 
-from lanscan.cli import find_conflicts, parse_arp_scan_output
+from lanscan.cli import build_parser, find_conflicts, parse_arp_scan_output
 
 
 class ParseArpScanOutputTests(unittest.TestCase):
@@ -67,6 +67,19 @@ class ParseArpScanOutputTests(unittest.TestCase):
             [str(ip) for ip in sorted(hosts)],
             ["192.168.1.9", "192.168.1.10", "192.168.1.100"],
         )
+
+    def test_free_is_a_view_option(self):
+        args = build_parser().parse_args(["192.168.1.0/24", "--free"])
+
+        self.assertTrue(args.free)
+        self.assertFalse(args.all)
+        self.assertFalse(args.conflicts)
+
+    def test_free_and_all_are_mutually_exclusive(self):
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(
+                ["192.168.1.0/24", "--free", "--all"]
+            )
 
 
 if __name__ == "__main__":
