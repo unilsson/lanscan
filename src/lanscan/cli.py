@@ -5,7 +5,7 @@ import sys
 
 from .arp import find_conflicts, parse_arp_scan_output, run_arp_scan
 from .dns import resolve_hostnames
-from .output import print_all, print_devices, print_json
+from .output import print_all, print_devices, print_free, print_json
 
 
 def build_parser():
@@ -25,6 +25,12 @@ def build_parser():
         "--all",
         action="store_true",
         help="Show used and apparently free IP addresses",
+    )
+
+    view.add_argument(
+        "--free",
+        action="store_true",
+        help="Show only apparently free IP addresses",
     )
 
     view.add_argument(
@@ -65,8 +71,8 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    if args.all and not args.network:
-        parser.error("--all requires an explicit network")
+    if (args.all or args.free) and not args.network:
+        parser.error("--all and --free require an explicit network")
 
     if args.passes is not None and args.passes < 1:
         parser.error("--passes must be at least 1")
@@ -82,12 +88,20 @@ def main():
 
     hostnames = (
         {}
-        if args.no_dns
+        if args.no_dns or args.free
         else resolve_hostnames(hosts.keys(), timeout=args.dns_timeout)
     )
 
     if args.json:
-        print_json(hosts, hostnames)
+        print_json(
+            hosts,
+            hostnames,
+            network=args.network,
+            include_free=args.all,
+            free_only=args.free,
+        )
+    elif args.free:
+        print_free(args.network, hosts)
     elif args.all:
         print_all(args.network, hosts, hostnames)
     else:
