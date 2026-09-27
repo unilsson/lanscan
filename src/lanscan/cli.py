@@ -4,7 +4,9 @@ import argparse
 import sys
 
 from .arp import find_conflicts, parse_arp_scan_output, run_arp_scan
+from .config import ConfigError, load_opnsense_config
 from .dns import resolve_hostnames
+from .opnsense import OpnsenseError, fetch_dhcp_leases, leases_in_network
 from .output import print_all, print_devices, print_free, print_json
 
 
@@ -24,7 +26,7 @@ def build_parser():
     view.add_argument(
         "--all",
         action="store_true",
-        help="Show used and apparently free IP addresses",
+        help="Show used, leased and apparently free IP addresses",
     )
 
     view.add_argument(
@@ -37,6 +39,12 @@ def build_parser():
         "--conflicts",
         action="store_true",
         help="Show only IP addresses seen with multiple MAC addresses",
+    )
+
+    parser.add_argument(
+        "--opnsense",
+        action="store_true",
+        help="Correlate results with active OPNsense ISC DHCPv4 leases",
     )
 
     parser.add_argument(
@@ -74,22 +82,48 @@ def main():
     if (args.all or args.free) and not args.network:
         parser.error("--all and --free require an explicit network")
 
+    if args.opnsense and not args.network:
+        parser.error("--opnsense requires an explicit network")
+
     if args.passes is not None and args.passes < 1:
         parser.error("--passes must be at least 1")
 
     if args.dns_timeout <= 0:
         parser.error("--dns-timeout must be greater than 0")
 
+    leases = None
+
+    if args.opnsense:
+        try:
+            config = load_opnsense_config()
+            leases = leases_in_network(
+                args.network,
+                fetch_dhcp_leases(config),
+            )
+        except (ConfigError, OpnsenseError) as exc:
+            print(f"lanscan: {exc}", file=sys.stderr)
+            return 1
+
     passes = args.passes if args.passes is not None else (3 if args.conflicts else 1)
     hosts = run_arp_scan(args.network, passes=passes)
 
     if args.conflicts:
         hosts = find_conflicts(hosts)
+        if leases is not None:
+            leases = {
+                ip: lease
+                for ip, lease in leases.items()
+                if ip in hosts
+            }
+
+    lookup_ips = set(hosts)
+    if leases:
+        lookup_ips.update(leases)
 
     hostnames = (
         {}
         if args.no_dns or args.free
-        else resolve_hostnames(hosts.keys(), timeout=args.dns_timeout)
+        else resolve_hostnames(lookup_ips, timeout=args.dns_timeout)
     )
 
     if args.json:
@@ -99,13 +133,14 @@ def main():
             network=args.network,
             include_free=args.all,
             free_only=args.free,
+            leases=leases,
         )
     elif args.free:
-        print_free(args.network, hosts)
+        print_free(args.network, hosts, leases)
     elif args.all:
-        print_all(args.network, hosts, hostnames)
+        print_all(args.network, hosts, hostnames, leases)
     else:
-        print_devices(hosts, hostnames)
+        print_devices(hosts, hostnames, leases)
 
     if args.conflicts and hosts:
         return 2
