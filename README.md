@@ -13,7 +13,7 @@ A small Python CLI for discovering devices, resolving hostnames and detecting IP
 - Detects multiple MAC addresses responding for the same IP
 - Shows apparently free addresses with `--all`
 - Shows only apparently free addresses with `--free`
-- Read-only OPNsense ISC DHCPv4 lease correlation with `--opnsense`
+- Read-only OPNsense ISC DHCPv4 lease and static reservation correlation with `--opnsense`
 - Conflict-only mode with `--conflicts`
 - Multiple ARP sweeps with `--passes`
 - JSON output
@@ -93,7 +93,7 @@ The network and broadcast addresses are excluded automatically. For example, wit
 
 ## OPNsense DHCP integration
 
-The OPNsense integration is opt-in and read-only. It currently targets the ISC DHCPv4 lease API.
+The OPNsense integration is opt-in and read-only. OPNsense 26.7.x returns both dynamic leases and static DHCP mappings from the ISC DHCPv4 lease API, and `lanscan` correlates both.
 
 Store credentials outside the repository in:
 
@@ -122,7 +122,7 @@ Correlate ARP results with active DHCP leases:
 lanscan 192.168.1.0/24 --opnsense
 ```
 
-An address with an active DHCP lease but no ARP response is shown as `LEASED` rather than `FREE`.
+An address with a dynamic DHCP lease but no ARP response is shown as `LEASED`. A static DHCP mapping without an ARP response is shown as `RESERVED`.
 
 Combine DHCP correlation with the free-address view:
 
@@ -130,15 +130,15 @@ Combine DHCP correlation with the free-address view:
 lanscan 192.168.1.0/24 --free --opnsense
 ```
 
-This excludes both addresses that answered ARP and addresses with an active OPNsense DHCP lease.
+This excludes addresses that answered ARP, active dynamic DHCP leases, and static DHCP reservations.
 
-Show the full address space with all three states:
+Show the full address space including `USED`, `LEASED`, `RESERVED` and `FREE`:
 
 ```bash
 lanscan 192.168.1.0/24 --all --opnsense
 ```
 
-The current OPNsense integration does not yet import static DHCP mappings. An offline address that is statically reserved may therefore still appear as `FREE`; static-mapping correlation is planned as a separate step.
+Static mappings are discovered from the same OPNsense response as dynamic leases. Offline static reservations are therefore protected from appearing as `FREE`.
 
 Show only detected IP conflicts:
 
@@ -168,7 +168,7 @@ lanscan 192.168.1.0/24 --free --json
 
 Free addresses are emitted with `"status": "free"`, `"hostname": null` and an empty `devices` list. `--all --json` includes both used and free addresses.
 
-With `--opnsense --json`, lease-only addresses use `"status": "leased"` and include a `lease` object with the DHCP data returned by OPNsense.
+With `--opnsense --json`, dynamic lease-only addresses use `"status": "leased"` and static mappings use `"status": "reserved"`. The `lease` object includes fields such as `type`, `status`, `description` and `manufacturer` when OPNsense supplies them.
 
 Conflict-only JSON output:
 
@@ -195,7 +195,7 @@ src/lanscan/
 
 Without `--opnsense`, `FREE` means that no host responded to ARP during the scan.
 
-With `--opnsense`, `FREE` means that no host responded to ARP and no active ISC DHCPv4 lease was returned for the address. It still does not guarantee that the address is permanently unused or not statically reserved.
+With `--opnsense`, `FREE` means that no host responded to ARP and OPNsense returned neither an active dynamic lease nor a static DHCP reservation for the address. It still does not guarantee that the address is permanently unused outside the information visible to these data sources.
 
 Likewise, conflict detection reports what was observed on the wire: more than one MAC address answered for the same IPv4 address during the scan passes.
 
@@ -209,6 +209,5 @@ python -m unittest discover -s tests -v
 
 ## Planned
 
-- OPNsense static mapping integration
-- Better correlation of active, leased and reserved addresses
+- Better correlation and reporting of active, leased and reserved addresses
 - Rich/TUI interface
