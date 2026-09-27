@@ -88,7 +88,7 @@ def build_parser():
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Output results as JSON",
+        help="Output results as versioned JSON",
     )
 
     return parser
