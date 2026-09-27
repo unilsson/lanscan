@@ -28,16 +28,28 @@ def free_addresses(network, hosts, leases=None):
 
 def build_summary(network, hosts, leases=None):
     net = ipaddress.ip_network(network, strict=False)
-    host_addresses = set(net.hosts())
+
+    if net.prefixlen == 32:
+        total = 1
+    elif net.prefixlen == 31:
+        total = 2
+    else:
+        total = net.num_addresses - 2
+
     arp_hosts = {
         ip: devices
         for ip, devices in hosts.items()
-        if ip in host_addresses
+        if ip in net and ip != net.network_address and ip != net.broadcast_address
     }
     lease_rows = {
         ip: lease
         for ip, lease in (leases or {}).items()
-        if ip in host_addresses and ip not in arp_hosts
+        if (
+            ip in net
+            and ip != net.network_address
+            and ip != net.broadcast_address
+            and ip not in arp_hosts
+        )
     }
 
     conflicts = sum(
@@ -51,8 +63,6 @@ def build_summary(network, hosts, leases=None):
     )
     leased = len(lease_rows) - reserved
     occupied = used + conflicts + leased + reserved
-    total = len(host_addresses)
-
     return {
         "network": str(net),
         "total": total,
