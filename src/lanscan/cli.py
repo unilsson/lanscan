@@ -36,7 +36,7 @@ def build_parser():
     view.add_argument(
         "--all",
         action="store_true",
-        help="Show used, leased, reserved and apparently free IP addresses",
+        help="Show used, conflicting, leased, reserved and apparently free IP addresses",
     )
 
     view.add_argument(
