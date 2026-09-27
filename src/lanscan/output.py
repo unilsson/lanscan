@@ -26,6 +26,16 @@ def free_addresses(network, hosts, leases=None):
     return [ip for ip in net.hosts() if ip not in occupied]
 
 
+def _is_host_address(net, ip):
+    if ip not in net:
+        return False
+
+    if net.prefixlen >= 31:
+        return True
+
+    return ip != net.network_address and ip != net.broadcast_address
+
+
 def build_summary(network, hosts, leases=None):
     net = ipaddress.ip_network(network, strict=False)
 
@@ -39,17 +49,12 @@ def build_summary(network, hosts, leases=None):
     arp_hosts = {
         ip: devices
         for ip, devices in hosts.items()
-        if ip in net and ip != net.network_address and ip != net.broadcast_address
+        if _is_host_address(net, ip)
     }
     lease_rows = {
         ip: lease
         for ip, lease in (leases or {}).items()
-        if (
-            ip in net
-            and ip != net.network_address
-            and ip != net.broadcast_address
-            and ip not in arp_hosts
-        )
+        if _is_host_address(net, ip) and ip not in arp_hosts
     }
 
     conflicts = sum(
