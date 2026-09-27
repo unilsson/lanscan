@@ -177,7 +177,7 @@ lanscan 192.168.1.0/24 --free --opnsense
 
 This excludes addresses that answered ARP, active dynamic DHCP leases, and static DHCP reservations.
 
-Show the full address space including `USED`, `LEASED`, `RESERVED` and `FREE`:
+Show the full address space including `USED`, `CONFLICT`, `LEASED`, `RESERVED` and `FREE`:
 
 ```bash
 lanscan 192.168.1.0/24 --all --opnsense
