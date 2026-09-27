@@ -37,13 +37,24 @@ def _hostname(ip, hostnames, leases):
     return "-"
 
 
+def _lease_status(lease):
+    return "RESERVED" if lease.is_static else "LEASED"
+
+
+def _lease_vendor(lease):
+    if lease.manufacturer:
+        return lease.manufacturer
+
+    return "OPNsense DHCP"
+
+
 def _print_lease_row(ip, lease, hostname):
     print(
         f"{str(ip):15}  "
-        f"{'LEASED':8}  "
+        f"{_lease_status(lease):8}  "
         f"{hostname:32}  "
         f"{(lease.mac or '-'):17}  "
-        f"OPNsense DHCP"
+        f"{_lease_vendor(lease)}"
     )
 
 
@@ -149,7 +160,7 @@ def _json_host(ip, devices, hostname, lease=None):
 def _json_leased(ip, lease, hostname):
     return {
         "ip": str(ip),
-        "status": "leased",
+        "status": "reserved" if lease.is_static else "leased",
         "hostname": hostname,
         "devices": [],
         "lease": lease.as_dict(),
