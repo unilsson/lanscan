@@ -16,6 +16,11 @@ def _print_header():
     )
 
 
+def free_addresses(network, hosts):
+    net = ipaddress.ip_network(network, strict=False)
+    return [ip for ip in net.hosts() if ip not in hosts]
+
+
 def print_devices(hosts, hostnames):
     _print_header()
 
@@ -69,23 +74,76 @@ def print_all(network, hosts, hostnames):
             )
 
 
-def build_json_data(hosts, hostnames):
-    data = []
+def print_free(network, hosts):
+    _print_header()
 
-    for ip in sorted(hosts):
-        devices = hosts[ip]
-
-        data.append(
-            {
-                "ip": str(ip),
-                "status": host_status(devices).lower(),
-                "hostname": hostnames.get(ip),
-                "devices": [device.as_dict() for device in devices],
-            }
+    for ip in free_addresses(network, hosts):
+        print(
+            f"{str(ip):15}  "
+            f"{'FREE':8}  "
+            f"{'-':32}"
         )
 
-    return data
+
+def _json_host(ip, devices, hostname):
+    return {
+        "ip": str(ip),
+        "status": host_status(devices).lower(),
+        "hostname": hostname,
+        "devices": [device.as_dict() for device in devices],
+    }
 
 
-def print_json(hosts, hostnames):
-    print(json.dumps(build_json_data(hosts, hostnames), indent=2))
+def _json_free(ip):
+    return {
+        "ip": str(ip),
+        "status": "free",
+        "hostname": None,
+        "devices": [],
+    }
+
+
+def build_json_data(
+    hosts,
+    hostnames,
+    network=None,
+    include_free=False,
+    free_only=False,
+):
+    if free_only:
+        return [_json_free(ip) for ip in free_addresses(network, hosts)]
+
+    if include_free:
+        net = ipaddress.ip_network(network, strict=False)
+        return [
+            _json_host(ip, hosts[ip], hostnames.get(ip))
+            if ip in hosts
+            else _json_free(ip)
+            for ip in net.hosts()
+        ]
+
+    return [
+        _json_host(ip, hosts[ip], hostnames.get(ip))
+        for ip in sorted(hosts)
+    ]
+
+
+def print_json(
+    hosts,
+    hostnames,
+    network=None,
+    include_free=False,
+    free_only=False,
+):
+    print(
+        json.dumps(
+            build_json_data(
+                hosts,
+                hostnames,
+                network=network,
+                include_free=include_free,
+                free_only=free_only,
+            ),
+            indent=2,
+        )
+    )
