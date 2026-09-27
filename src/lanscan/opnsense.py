@@ -102,6 +102,10 @@ def parse_dhcp_leases(payload) -> dict[IPv4Address, DhcpLease]:
             state=_text(row.get("state")),
             starts=_text(row.get("starts") or row.get("start")),
             ends=_text(row.get("ends") or row.get("end")),
+            lease_type=_text(row.get("type")),
+            status=_text(row.get("status")),
+            description=_text(row.get("descr") or row.get("description")),
+            manufacturer=_text(row.get("man") or row.get("manufacturer")),
         )
 
     return leases
