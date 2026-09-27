@@ -85,7 +85,7 @@ def parse_dhcp_leases(payload) -> dict[IPv4Address, DhcpLease]:
         if mac:
             mac = mac.lower()
 
-        leases[ip] = DhcpLease(
+        lease = DhcpLease(
             ip=ip,
             mac=mac,
             hostname=_text(
@@ -107,6 +107,10 @@ def parse_dhcp_leases(payload) -> dict[IPv4Address, DhcpLease]:
             description=_text(row.get("descr") or row.get("description")),
             manufacturer=_text(row.get("man") or row.get("manufacturer")),
         )
+
+        existing = leases.get(ip)
+        if existing is None or lease.is_static or not existing.is_static:
+            leases[ip] = lease
 
     return leases
 
