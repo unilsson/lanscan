@@ -81,6 +81,13 @@ class ParseArpScanOutputTests(unittest.TestCase):
                 ["192.168.1.0/24", "--free", "--all"]
             )
 
+    def test_opnsense_flag_is_available(self):
+        args = build_parser().parse_args(
+            ["192.168.1.0/24", "--opnsense"]
+        )
+
+        self.assertTrue(args.opnsense)
+
 
 if __name__ == "__main__":
     unittest.main()

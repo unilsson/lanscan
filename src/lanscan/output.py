@@ -16,49 +16,57 @@ def _print_header():
     )
 
 
-def free_addresses(network, hosts):
+def free_addresses(network, hosts, leases=None):
     net = ipaddress.ip_network(network, strict=False)
-    return [ip for ip in net.hosts() if ip not in hosts]
+    occupied = set(hosts)
+
+    if leases:
+        occupied.update(leases)
+
+    return [ip for ip in net.hosts() if ip not in occupied]
 
 
-def print_devices(hosts, hostnames):
+def _hostname(ip, hostnames, leases):
+    hostname = hostnames.get(ip)
+    if hostname:
+        return hostname
+
+    if leases and ip in leases:
+        return leases[ip].hostname or "-"
+
+    return "-"
+
+
+def _print_lease_row(ip, lease, hostname):
+    print(
+        f"{str(ip):15}  "
+        f"{'LEASED':8}  "
+        f"{hostname:32}  "
+        f"{(lease.mac or '-'):17}  "
+        f"OPNsense DHCP"
+    )
+
+
+def print_devices(hosts, hostnames, leases=None):
     _print_header()
 
-    for ip in sorted(hosts):
-        devices = hosts[ip]
-        status = host_status(devices)
-        hostname = hostnames.get(ip) or "-"
+    addresses = set(hosts)
+    if leases:
+        addresses.update(leases)
 
-        for index, device in enumerate(devices):
-            ip_text = str(ip) if index == 0 else ""
-            status_text = status if index == 0 else ""
-            hostname_text = hostname if index == 0 else ""
-
-            print(
-                f"{ip_text:15}  "
-                f"{status_text:8}  "
-                f"{hostname_text:32}  "
-                f"{device.mac:17}  "
-                f"{device.vendor}"
-            )
-
-
-def print_all(network, hosts, hostnames):
-    net = ipaddress.ip_network(network, strict=False)
-    _print_header()
-
-    for ip in net.hosts():
+    for ip in sorted(addresses):
         if ip not in hosts:
-            print(
-                f"{str(ip):15}  "
-                f"{'FREE':8}  "
-                f"{'-':32}"
+            lease = leases[ip]
+            _print_lease_row(
+                ip,
+                lease,
+                _hostname(ip, hostnames, leases),
             )
             continue
 
         devices = hosts[ip]
         status = host_status(devices)
-        hostname = hostnames.get(ip) or "-"
+        hostname = _hostname(ip, hostnames, leases)
 
         for index, device in enumerate(devices):
             ip_text = str(ip) if index == 0 else ""
@@ -74,10 +82,49 @@ def print_all(network, hosts, hostnames):
             )
 
 
-def print_free(network, hosts):
+def print_all(network, hosts, hostnames, leases=None):
+    net = ipaddress.ip_network(network, strict=False)
     _print_header()
 
-    for ip in free_addresses(network, hosts):
+    for ip in net.hosts():
+        if ip not in hosts:
+            if leases and ip in leases:
+                lease = leases[ip]
+                _print_lease_row(
+                    ip,
+                    lease,
+                    _hostname(ip, hostnames, leases),
+                )
+            else:
+                print(
+                    f"{str(ip):15}  "
+                    f"{'FREE':8}  "
+                    f"{'-':32}"
+                )
+            continue
+
+        devices = hosts[ip]
+        status = host_status(devices)
+        hostname = _hostname(ip, hostnames, leases)
+
+        for index, device in enumerate(devices):
+            ip_text = str(ip) if index == 0 else ""
+            status_text = status if index == 0 else ""
+            hostname_text = hostname if index == 0 else ""
+
+            print(
+                f"{ip_text:15}  "
+                f"{status_text:8}  "
+                f"{hostname_text:32}  "
+                f"{device.mac:17}  "
+                f"{device.vendor}"
+            )
+
+
+def print_free(network, hosts, leases=None):
+    _print_header()
+
+    for ip in free_addresses(network, hosts, leases):
         print(
             f"{str(ip):15}  "
             f"{'FREE':8}  "
@@ -85,22 +132,56 @@ def print_free(network, hosts):
         )
 
 
-def _json_host(ip, devices, hostname):
-    return {
+def _json_host(ip, devices, hostname, lease=None):
+    row = {
         "ip": str(ip),
         "status": host_status(devices).lower(),
         "hostname": hostname,
         "devices": [device.as_dict() for device in devices],
     }
 
+    if lease is not None:
+        row["lease"] = lease.as_dict()
 
-def _json_free(ip):
+    return row
+
+
+def _json_leased(ip, lease, hostname):
     return {
+        "ip": str(ip),
+        "status": "leased",
+        "hostname": hostname,
+        "devices": [],
+        "lease": lease.as_dict(),
+    }
+
+
+def _json_free(ip, include_lease_field=False):
+    row = {
         "ip": str(ip),
         "status": "free",
         "hostname": None,
         "devices": [],
     }
+
+    if include_lease_field:
+        row["lease"] = None
+
+    return row
+
+
+def _json_address(ip, hosts, hostnames, leases, include_lease_field):
+    lease = leases.get(ip) if leases else None
+
+    if ip in hosts:
+        hostname = hostnames.get(ip) or (lease.hostname if lease else None)
+        return _json_host(ip, hosts[ip], hostname, lease)
+
+    if lease is not None:
+        hostname = hostnames.get(ip) or lease.hostname
+        return _json_leased(ip, lease, hostname)
+
+    return _json_free(ip, include_lease_field=include_lease_field)
 
 
 def build_json_data(
@@ -109,22 +190,42 @@ def build_json_data(
     network=None,
     include_free=False,
     free_only=False,
+    leases=None,
 ):
+    include_lease_field = leases is not None
+
     if free_only:
-        return [_json_free(ip) for ip in free_addresses(network, hosts)]
+        return [
+            _json_free(ip, include_lease_field=include_lease_field)
+            for ip in free_addresses(network, hosts, leases)
+        ]
 
     if include_free:
         net = ipaddress.ip_network(network, strict=False)
         return [
-            _json_host(ip, hosts[ip], hostnames.get(ip))
-            if ip in hosts
-            else _json_free(ip)
+            _json_address(
+                ip,
+                hosts,
+                hostnames,
+                leases,
+                include_lease_field,
+            )
             for ip in net.hosts()
         ]
 
+    addresses = set(hosts)
+    if leases:
+        addresses.update(leases)
+
     return [
-        _json_host(ip, hosts[ip], hostnames.get(ip))
-        for ip in sorted(hosts)
+        _json_address(
+            ip,
+            hosts,
+            hostnames,
+            leases,
+            include_lease_field,
+        )
+        for ip in sorted(addresses)
     ]
 
 
@@ -134,6 +235,7 @@ def print_json(
     network=None,
     include_free=False,
     free_only=False,
+    leases=None,
 ):
     print(
         json.dumps(
@@ -143,6 +245,7 @@ def print_json(
                 network=network,
                 include_free=include_free,
                 free_only=free_only,
+                leases=leases,
             ),
             indent=2,
         )
