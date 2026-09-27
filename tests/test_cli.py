@@ -87,6 +87,27 @@ class ParseArpScanOutputTests(unittest.TestCase):
         )
 
         self.assertTrue(args.opnsense)
+    def test_summary_is_a_view_option(self):
+        args = build_parser().parse_args(
+            ["192.168.1.0/24", "--summary"]
+        )
+
+        self.assertTrue(args.summary)
+        self.assertFalse(args.all)
+        self.assertFalse(args.free)
+        self.assertFalse(args.conflicts)
+
+    def test_summary_and_all_are_mutually_exclusive(self):
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(
+                ["192.168.1.0/24", "--summary", "--all"]
+            )
+
+    def test_help_mentions_reserved_and_static_mappings(self):
+        help_text = build_parser().format_help()
+
+        self.assertIn("reserved", help_text)
+        self.assertIn("static mappings", help_text)
 
 
 if __name__ == "__main__":

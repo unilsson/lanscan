@@ -26,6 +26,77 @@ def free_addresses(network, hosts, leases=None):
     return [ip for ip in net.hosts() if ip not in occupied]
 
 
+def _is_host_address(net, ip):
+    if ip not in net:
+        return False
+
+    if net.prefixlen >= 31:
+        return True
+
+    return ip != net.network_address and ip != net.broadcast_address
+
+
+def build_summary(network, hosts, leases=None):
+    net = ipaddress.ip_network(network, strict=False)
+
+    if net.prefixlen == 32:
+        total = 1
+    elif net.prefixlen == 31:
+        total = 2
+    else:
+        total = net.num_addresses - 2
+
+    arp_hosts = {
+        ip: devices
+        for ip, devices in hosts.items()
+        if _is_host_address(net, ip)
+    }
+    lease_rows = {
+        ip: lease
+        for ip, lease in (leases or {}).items()
+        if _is_host_address(net, ip) and ip not in arp_hosts
+    }
+
+    conflicts = sum(
+        1 for devices in arp_hosts.values()
+        if len(devices) > 1
+    )
+    used = len(arp_hosts) - conflicts
+    reserved = sum(
+        1 for lease in lease_rows.values()
+        if lease.is_static
+    )
+    leased = len(lease_rows) - reserved
+    occupied = used + conflicts + leased + reserved
+    return {
+        "network": str(net),
+        "total": total,
+        "occupied": occupied,
+        "used": used,
+        "conflicts": conflicts,
+        "leased": leased,
+        "reserved": reserved,
+        "free": total - occupied,
+    }
+
+
+def print_summary(network, hosts, leases=None):
+    summary = build_summary(network, hosts, leases)
+
+    print(f"Network:   {summary['network']}")
+    print(f"Total:     {summary['total']}")
+    print(f"Occupied:  {summary['occupied']}")
+    print(f"USED:      {summary['used']}")
+    print(f"CONFLICT:  {summary['conflicts']}")
+    print(f"LEASED:    {summary['leased']}")
+    print(f"RESERVED:  {summary['reserved']}")
+    print(f"FREE:      {summary['free']}")
+
+
+def print_summary_json(network, hosts, leases=None):
+    print(json.dumps(build_summary(network, hosts, leases), indent=2))
+
+
 def _hostname(ip, hostnames, leases):
     hostname = hostnames.get(ip)
     if hostname:

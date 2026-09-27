@@ -7,12 +7,22 @@ from .arp import find_conflicts, parse_arp_scan_output, run_arp_scan
 from .config import ConfigError, load_opnsense_config
 from .dns import resolve_hostnames
 from .opnsense import OpnsenseError, fetch_dhcp_leases, leases_in_network
-from .output import print_all, print_devices, print_free, print_json
+from .output import (
+    print_all,
+    print_devices,
+    print_free,
+    print_json,
+    print_summary,
+    print_summary_json,
+)
 
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Discover devices, hostnames and IP conflicts on a local LAN"
+        description=(
+            "Discover LAN devices and correlate ARP, reverse DNS and "
+            "OPNsense DHCP allocation data"
+        )
     )
 
     parser.add_argument(
@@ -26,13 +36,19 @@ def build_parser():
     view.add_argument(
         "--all",
         action="store_true",
-        help="Show used, leased and apparently free IP addresses",
+        help="Show used, conflicting, leased, reserved and apparently free IP addresses",
     )
 
     view.add_argument(
         "--free",
         action="store_true",
         help="Show only apparently free IP addresses",
+    )
+
+    view.add_argument(
+        "--summary",
+        action="store_true",
+        help="Show address allocation counts for the network",
     )
 
     view.add_argument(
@@ -44,7 +60,10 @@ def build_parser():
     parser.add_argument(
         "--opnsense",
         action="store_true",
-        help="Correlate results with active OPNsense ISC DHCPv4 leases",
+        help=(
+            "Correlate results with OPNsense ISC DHCPv4 dynamic leases "
+            "and static mappings"
+        ),
     )
 
     parser.add_argument(
@@ -79,8 +98,8 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    if (args.all or args.free) and not args.network:
-        parser.error("--all and --free require an explicit network")
+    if (args.all or args.free or args.summary) and not args.network:
+        parser.error("--all, --free and --summary require an explicit network")
 
     if args.opnsense and not args.network:
         parser.error("--opnsense requires an explicit network")
@@ -122,11 +141,16 @@ def main():
 
     hostnames = (
         {}
-        if args.no_dns or args.free
+        if args.no_dns or args.free or args.summary
         else resolve_hostnames(lookup_ips, timeout=args.dns_timeout)
     )
 
-    if args.json:
+    if args.summary:
+        if args.json:
+            print_summary_json(args.network, hosts, leases)
+        else:
+            print_summary(args.network, hosts, leases)
+    elif args.json:
         print_json(
             hosts,
             hostnames,

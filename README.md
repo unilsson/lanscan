@@ -11,8 +11,9 @@ A small Python CLI for discovering devices, resolving hostnames and detecting IP
 - DNS lookups run concurrently with a configurable timeout
 - `--no-dns` mode for ARP-only scans
 - Detects multiple MAC addresses responding for the same IP
-- Shows apparently free addresses with `--all`
+- Shows the complete address allocation with `--all`
 - Shows only apparently free addresses with `--free`
+- Summarizes address allocation with `--summary`, including JSON output for integrations
 - Read-only OPNsense ISC DHCPv4 lease and static reservation correlation with `--opnsense`
 - Conflict-only mode with `--conflicts`
 - Multiple ARP sweeps with `--passes`
@@ -91,6 +92,50 @@ lanscan 192.168.1.0/24 --free
 
 The network and broadcast addresses are excluded automatically. For example, with `192.168.1.0/24`, `--free` considers host addresses `192.168.1.1` through `192.168.1.254`.
 
+Show a compact allocation summary:
+
+```bash
+lanscan 192.168.1.0/24 --summary --opnsense
+```
+
+Example:
+
+```text
+Network:   192.168.1.0/24
+Total:     254
+Occupied:  83
+USED:      61
+CONFLICT:  0
+LEASED:    8
+RESERVED:  14
+FREE:      171
+```
+
+The summary counts address states, so `USED` and `CONFLICT` are separate categories and all status counts add up to `Total`. With `--opnsense`, dynamic leases and static reservations are included; without it, the summary is based on ARP observations only. Reverse DNS is skipped in summary mode because hostnames are not needed for the counts.
+
+For machine-readable output:
+
+```bash
+lanscan 192.168.1.0/24 --summary --opnsense --json
+```
+
+Example:
+
+```json
+{
+  "network": "192.168.1.0/24",
+  "total": 254,
+  "occupied": 83,
+  "used": 61,
+  "conflicts": 0,
+  "leased": 8,
+  "reserved": 14,
+  "free": 171
+}
+```
+
+This compact JSON form is suitable for later integrations such as House Portal.
+
 ## OPNsense DHCP integration
 
 The OPNsense integration is opt-in and read-only. OPNsense 26.7.x returns both dynamic leases and static DHCP mappings from the ISC DHCPv4 lease API, and `lanscan` correlates both.
@@ -132,7 +177,7 @@ lanscan 192.168.1.0/24 --free --opnsense
 
 This excludes addresses that answered ARP, active dynamic DHCP leases, and static DHCP reservations.
 
-Show the full address space including `USED`, `LEASED`, `RESERVED` and `FREE`:
+Show the full address space including `USED`, `CONFLICT`, `LEASED`, `RESERVED` and `FREE`:
 
 ```bash
 lanscan 192.168.1.0/24 --all --opnsense
@@ -209,5 +254,6 @@ python -m unittest discover -s tests -v
 
 ## Planned
 
+- House Portal integration using summary/JSON data
 - Better correlation and reporting of active, leased and reserved addresses
 - Rich/TUI interface
