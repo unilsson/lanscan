@@ -17,6 +17,8 @@ class OpnsenseTests(unittest.TestCase):
                         "state": "active",
                         "starts": "2026-09-27 03:00:00",
                         "ends": "2026-09-27 05:00:00",
+                        "type": "dynamic",
+                        "status": "online",
                     }
                 ]
             }
@@ -27,6 +29,67 @@ class OpnsenseTests(unittest.TestCase):
         self.assertEqual(leases[ip].mac, "aa:bb:cc:dd:ee:ff")
         self.assertEqual(leases[ip].hostname, "example-host")
         self.assertEqual(leases[ip].interface, "LAN")
+        self.assertEqual(leases[ip].lease_type, "dynamic")
+        self.assertFalse(leases[ip].is_static)
+
+    def test_parse_static_mapping(self):
+        leases = parse_dhcp_leases(
+            {
+                "rows": [
+                    {
+                        "address": "192.168.1.68",
+                        "type": "static",
+                        "mac": "d8:eb:46:b6:c5:9d",
+                        "starts": "",
+                        "ends": "",
+                        "hostname": "",
+                        "descr": "Google Nest Ulfs rum",
+                        "if_descr": "LAN",
+                        "if": "lan",
+                        "state": "active",
+                        "status": "offline",
+                        "man": "Google, Inc.",
+                    }
+                ]
+            }
+        )
+
+        ip = ipaddress.ip_address("192.168.1.68")
+        self.assertIn(ip, leases)
+        self.assertTrue(leases[ip].is_static)
+        self.assertEqual(leases[ip].lease_type, "static")
+        self.assertEqual(leases[ip].status, "offline")
+        self.assertEqual(
+            leases[ip].description,
+            "Google Nest Ulfs rum",
+        )
+        self.assertEqual(leases[ip].manufacturer, "Google, Inc.")
+
+    def test_static_mapping_wins_over_dynamic_duplicate(self):
+        leases = parse_dhcp_leases(
+            {
+                "rows": [
+                    {
+                        "address": "192.168.1.68",
+                        "type": "static",
+                        "mac": "d8:eb:46:b6:c5:9d",
+                        "state": "active",
+                        "status": "offline",
+                    },
+                    {
+                        "address": "192.168.1.68",
+                        "type": "dynamic",
+                        "mac": "d8:eb:46:b6:c5:9d",
+                        "state": "active",
+                        "status": "online",
+                    },
+                ]
+            }
+        )
+
+        ip = ipaddress.ip_address("192.168.1.68")
+        self.assertTrue(leases[ip].is_static)
+        self.assertEqual(leases[ip].status, "offline")
 
     def test_inactive_lease_is_ignored(self):
         leases = parse_dhcp_leases(
