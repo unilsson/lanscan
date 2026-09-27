@@ -2,7 +2,7 @@ import ipaddress
 import unittest
 
 from lanscan.models import ArpDevice, DhcpLease
-from lanscan.output import build_json_data, free_addresses
+from lanscan.output import build_json_data, build_summary, free_addresses
 
 
 class OutputTests(unittest.TestCase):
@@ -198,6 +198,92 @@ class OutputTests(unittest.TestCase):
             data[0]["lease"]["description"],
             "Google Nest Ulfs rum",
         )
+    def test_summary_counts_all_address_states(self):
+        used = ipaddress.ip_address("192.168.1.1")
+        conflict = ipaddress.ip_address("192.168.1.2")
+        leased = ipaddress.ip_address("192.168.1.3")
+        reserved = ipaddress.ip_address("192.168.1.4")
+
+        hosts = {
+            used: [
+                ArpDevice(
+                    ip=used,
+                    mac="aa:bb:cc:dd:ee:01",
+                    vendor="Vendor A",
+                )
+            ],
+            conflict: [
+                ArpDevice(
+                    ip=conflict,
+                    mac="aa:bb:cc:dd:ee:02",
+                    vendor="Vendor B",
+                ),
+                ArpDevice(
+                    ip=conflict,
+                    mac="aa:bb:cc:dd:ee:03",
+                    vendor="Vendor C",
+                ),
+            ],
+        }
+
+        leases = {
+            used: DhcpLease(
+                ip=used,
+                lease_type="static",
+                state="active",
+            ),
+            leased: DhcpLease(
+                ip=leased,
+                lease_type="dynamic",
+                state="active",
+            ),
+            reserved: DhcpLease(
+                ip=reserved,
+                lease_type="static",
+                state="active",
+                status="offline",
+            ),
+        }
+
+        summary = build_summary(
+            "192.168.1.0/29",
+            hosts,
+            leases,
+        )
+
+        self.assertEqual(
+            summary,
+            {
+                "network": "192.168.1.0/29",
+                "total": 6,
+                "occupied": 4,
+                "used": 1,
+                "conflicts": 1,
+                "leased": 1,
+                "reserved": 1,
+                "free": 2,
+            },
+        )
+
+    def test_summary_without_opnsense_is_arp_only(self):
+        used = ipaddress.ip_address("192.168.1.1")
+        hosts = {
+            used: [
+                ArpDevice(
+                    ip=used,
+                    mac="aa:bb:cc:dd:ee:ff",
+                    vendor="Example Vendor",
+                )
+            ]
+        }
+
+        summary = build_summary("192.168.1.0/30", hosts)
+
+        self.assertEqual(summary["total"], 2)
+        self.assertEqual(summary["used"], 1)
+        self.assertEqual(summary["leased"], 0)
+        self.assertEqual(summary["reserved"], 0)
+        self.assertEqual(summary["free"], 1)
 
 
 if __name__ == "__main__":
