@@ -2,6 +2,9 @@ import ipaddress
 import json
 
 
+JSON_SCHEMA_VERSION = 1
+
+
 def host_status(devices):
     return "CONFLICT" if len(devices) > 1 else "USED"
 
@@ -93,8 +96,20 @@ def print_summary(network, hosts, leases=None):
     print(f"FREE:      {summary['free']}")
 
 
+def build_summary_json_document(network, hosts, leases=None):
+    return {
+        "schema_version": JSON_SCHEMA_VERSION,
+        "summary": build_summary(network, hosts, leases),
+    }
+
+
 def print_summary_json(network, hosts, leases=None):
-    print(json.dumps(build_summary(network, hosts, leases), indent=2))
+    print(
+        json.dumps(
+            build_summary_json_document(network, hosts, leases),
+            indent=2,
+        )
+    )
 
 
 def _hostname(ip, hostnames, leases):
@@ -311,6 +326,27 @@ def build_json_data(
     ]
 
 
+def build_json_document(
+    hosts,
+    hostnames,
+    network=None,
+    include_free=False,
+    free_only=False,
+    leases=None,
+):
+    return {
+        "schema_version": JSON_SCHEMA_VERSION,
+        "results": build_json_data(
+            hosts,
+            hostnames,
+            network=network,
+            include_free=include_free,
+            free_only=free_only,
+            leases=leases,
+        ),
+    }
+
+
 def print_json(
     hosts,
     hostnames,
@@ -321,7 +357,7 @@ def print_json(
 ):
     print(
         json.dumps(
-            build_json_data(
+            build_json_document(
                 hosts,
                 hostnames,
                 network=network,

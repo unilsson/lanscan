@@ -2,7 +2,14 @@ import ipaddress
 import unittest
 
 from lanscan.models import ArpDevice, DhcpLease
-from lanscan.output import build_json_data, build_summary, free_addresses
+from lanscan.output import (
+    JSON_SCHEMA_VERSION,
+    build_json_data,
+    build_json_document,
+    build_summary,
+    build_summary_json_document,
+    free_addresses,
+)
 
 
 class OutputTests(unittest.TestCase):
@@ -284,6 +291,47 @@ class OutputTests(unittest.TestCase):
         self.assertEqual(summary["leased"], 0)
         self.assertEqual(summary["reserved"], 0)
         self.assertEqual(summary["free"], 1)
+    def test_json_document_has_schema_version_and_results(self):
+        ip = ipaddress.ip_address("192.168.1.20")
+        hosts = {
+            ip: [
+                ArpDevice(
+                    ip=ip,
+                    mac="aa:bb:cc:dd:ee:ff",
+                    vendor="Example Vendor",
+                )
+            ]
+        }
+
+        document = build_json_document(
+            hosts,
+            {ip: "host.ulnihnw.net"},
+        )
+
+        self.assertEqual(document["schema_version"], JSON_SCHEMA_VERSION)
+        self.assertIn("results", document)
+        self.assertEqual(document["results"][0]["ip"], "192.168.1.20")
+
+    def test_summary_json_document_has_schema_version_and_summary(self):
+        document = build_summary_json_document(
+            "192.168.1.0/30",
+            {},
+        )
+
+        self.assertEqual(document["schema_version"], JSON_SCHEMA_VERSION)
+        self.assertEqual(
+            document["summary"],
+            {
+                "network": "192.168.1.0/30",
+                "total": 2,
+                "occupied": 0,
+                "used": 0,
+                "conflicts": 0,
+                "leased": 0,
+                "reserved": 0,
+                "free": 2,
+            },
+        )
 
 
 if __name__ == "__main__":
