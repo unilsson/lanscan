@@ -65,6 +65,32 @@ class OpnsenseTests(unittest.TestCase):
         )
         self.assertEqual(leases[ip].manufacturer, "Google, Inc.")
 
+    def test_static_mapping_wins_over_dynamic_duplicate(self):
+        leases = parse_dhcp_leases(
+            {
+                "rows": [
+                    {
+                        "address": "192.168.1.68",
+                        "type": "static",
+                        "mac": "d8:eb:46:b6:c5:9d",
+                        "state": "active",
+                        "status": "offline",
+                    },
+                    {
+                        "address": "192.168.1.68",
+                        "type": "dynamic",
+                        "mac": "d8:eb:46:b6:c5:9d",
+                        "state": "active",
+                        "status": "online",
+                    },
+                ]
+            }
+        )
+
+        ip = ipaddress.ip_address("192.168.1.68")
+        self.assertTrue(leases[ip].is_static)
+        self.assertEqual(leases[ip].status, "offline")
+
     def test_inactive_lease_is_ignored(self):
         leases = parse_dhcp_leases(
             {
