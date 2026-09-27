@@ -123,14 +123,17 @@ Example:
 
 ```json
 {
-  "network": "192.168.1.0/24",
-  "total": 254,
-  "occupied": 83,
-  "used": 61,
-  "conflicts": 0,
-  "leased": 8,
-  "reserved": 14,
-  "free": 171
+  "schema_version": 1,
+  "summary": {
+    "network": "192.168.1.0/24",
+    "total": 254,
+    "occupied": 83,
+    "used": 61,
+    "conflicts": 0,
+    "leased": 8,
+    "reserved": 14,
+    "free": 171
+  }
 }
 ```
 
@@ -203,6 +206,22 @@ JSON output:
 lanscan 192.168.1.0/24 --json
 ```
 
+JSON output uses a versioned top-level envelope:
+
+```json
+{
+  "schema_version": 1,
+  "results": [
+    {
+      "ip": "192.168.1.20",
+      "status": "used",
+      "hostname": "host.example.net",
+      "devices": []
+    }
+  ]
+}
+```
+
 Each JSON host includes a `hostname` field. It is `null` when no PTR/NSS name could be resolved.
 
 Free-only JSON output:
@@ -214,6 +233,17 @@ lanscan 192.168.1.0/24 --free --json
 Free addresses are emitted with `"status": "free"`, `"hostname": null` and an empty `devices` list. `--all --json` includes both used and free addresses.
 
 With `--opnsense --json`, dynamic lease-only addresses use `"status": "leased"` and static mappings use `"status": "reserved"`. The `lease` object includes fields such as `type`, `status`, `description` and `manufacturer` when OPNsense supplies them.
+
+## JSON schema versioning
+
+All machine-readable JSON output has a top-level `schema_version`. Consumers should check this value before parsing the payload.
+
+Schema version `1` uses:
+
+- `{"schema_version": 1, "results": [...]}` for scan, free, all and conflict JSON output.
+- `{"schema_version": 1, "summary": {...}}` for `--summary --json`.
+
+The schema version is independent of the `lanscan` package version. A future incompatible JSON structure will increment `schema_version`; compatible additions may keep the same schema version.
 
 Conflict-only JSON output:
 
