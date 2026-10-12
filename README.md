@@ -33,6 +33,58 @@ Ubuntu/Debian:
 sudo apt install arp-scan
 ```
 
+## Installation (recommended: pipx)
+
+Install on Ubuntu, Kubuntu or Debian with Python 3.11 or newer. `pipx` keeps the Python application isolated from system Python and exposes the `lanscan` command globally for your user.
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv pipx arp-scan
+pipx ensurepath
+```
+
+Open a **new terminal** after `pipx ensurepath` so `~/.local/bin` is included in your PATH. Then install directly from GitHub:
+
+```bash
+pipx install git+https://github.com/unilsson/lanscan.git
+lanscan --version
+lanscan --help
+lanscan --no-dns
+```
+
+The command can now run from any directory. `arp-scan` is a separate OS dependency and requires elevated privileges for raw network access; `lanscan` currently invokes `sudo arp-scan` when scanning. You may therefore be asked for your sudo password. **Run `lanscan` as your normal user, not with `sudo lanscan` or `sudo pipx`.** Avoid granting passwordless sudo broadly or using setuid shortcuts.
+
+To update to the latest main branch:
+
+```bash
+pipx upgrade lanscan
+```
+
+To uninstall:
+
+```bash
+pipx uninstall lanscan
+```
+
+Uninstalling the Python application does not remove the separately installed `arp-scan` package or your OPNsense configuration in `~/.config/lanscan/config.toml`.
+
+For a local checkout instead of the GitHub URL:
+
+```bash
+git clone https://github.com/unilsson/lanscan.git
+cd lanscan
+pipx install .
+```
+
+To upgrade a local-development installation, rebuild it with `pipx reinstall lanscan` from its original source, or uninstall and install the checkout again.
+
+### Installation troubleshooting
+
+- **`lanscan: command not found`**: open a new terminal after `pipx ensurepath`; inspect `pipx list` and `echo "$PATH"`.
+- **`arp-scan: command not found`**: install the system dependency with `sudo apt install arp-scan`.
+- **Permission / sudo prompt**: raw ARP discovery uses `sudo arp-scan`; confirm your user may run sudo and that scanning is permitted on the network.
+- **`--opnsense` configuration errors**: create `~/.config/lanscan/config.toml` as documented below and restrict access with `chmod 600 ~/.config/lanscan/config.toml`.
+
 ## Development installation
 
 ```bash
