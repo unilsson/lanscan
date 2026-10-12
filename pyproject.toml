@@ -9,6 +9,11 @@ description = "A LAN discovery CLI with ARP conflict detection and reverse DNS"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Environment :: Console",
+]
 
 [project.scripts]
 lanscan = "lanscan.cli:main"

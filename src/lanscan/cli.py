@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+from importlib.metadata import PackageNotFoundError, version
 
 from .arp import find_conflicts, parse_arp_scan_output, run_arp_scan
 from .config import ConfigError, load_opnsense_config
@@ -17,12 +18,25 @@ from .output import (
 )
 
 
+def package_version():
+    try:
+        return version("lanscan")
+    except PackageNotFoundError:
+        return "unknown"
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description=(
             "Discover LAN devices and correlate ARP, reverse DNS and "
             "OPNsense DHCP allocation data"
         )
+    )
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {package_version()}",
     )
 
     parser.add_argument(

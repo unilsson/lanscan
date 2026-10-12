@@ -1,5 +1,6 @@
 import ipaddress
 import unittest
+from unittest.mock import patch
 from collections import defaultdict
 
 from lanscan.cli import build_parser, find_conflicts, parse_arp_scan_output
@@ -67,6 +68,12 @@ class ParseArpScanOutputTests(unittest.TestCase):
             [str(ip) for ip in sorted(hosts)],
             ["192.168.1.9", "192.168.1.10", "192.168.1.100"],
         )
+
+    def test_version_option_exits_successfully(self):
+        with patch("lanscan.cli.package_version", return_value="0.6.0"):
+            with self.assertRaises(SystemExit) as result:
+                build_parser().parse_args(["--version"])
+        self.assertEqual(result.exception.code, 0)
 
     def test_free_is_a_view_option(self):
         args = build_parser().parse_args(["192.168.1.0/24", "--free"])
